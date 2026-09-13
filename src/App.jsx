@@ -1,11 +1,20 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { DNEVNO, OBLASTI, KVARTALI, PRAVILA, ULOG, BAZA, GODINA_CILJ, POCETAK, KRAJ } from "./config.js";
 import { ucitaj, snimi as snimiUStorage, rezimCuvanja, izvezi } from "./storage.js";
 
 /* ============================ POMOĆNE ============================ */
 
-const iso = (d) => new Date(d).toISOString().slice(0, 10);
+/* Datum u "YYYY-MM-DD", iz LOKALNIH komponenti.
+   Ne koristi toISOString() — on je UTC, pa je u Beogradu (UTC+1/+2)
+   vraćao dan ranije i pomerao ceo nedeljni prozor. */
+function iso(d) {
+  if (typeof d === "string") return d.slice(0, 10);
+  const x = d instanceof Date ? d : new Date(d);
+  const m = String(x.getMonth() + 1).padStart(2, "0");
+  const dd = String(x.getDate()).padStart(2, "0");
+  return `${x.getFullYear()}-${m}-${dd}`;
+}
 const danas = () => iso(new Date());
 const fmt = (n) => (Number(n) || 0).toLocaleString("sr-RS");
 
@@ -207,10 +216,132 @@ function oceniNedelju(w, data, mon) {
   return o;
 }
 
+/* ============================ IZVEŠTAJ ZA PETAK ============================ */
+
+const DANI_KRATKO = ["pon", "uto", "sre", "čet", "pet", "sub", "ned"];
+/* Kratka imena za red "dan po dan". Ključ iz config.js kad nema unosa ovde. */
+const KRATKO = { naplaceno: "naplaćeno" };
+/* Nazivi iz config.js su napisani za dnevni red ("Naplaćeno danas"), pa u
+   nedeljnim zbirovima zvuče pogrešno. Ovde samo ta odstupanja. */
+const ZBIR_IME = { naplaceno: "Naplaćeno", trening: "Treninzi", poziv: "Prodajni pozivi", san: "Noći pre 00:30" };
+const dm = (d) => `${d.slice(8)}.${d.slice(5, 7)}`;
+
+const kvartalZa = (d) => KVARTALI.find((q) => d >= q.od && d <= q.do) || null;
+
+/* Pravilo kapija na jednom mestu — koristi ga i tab Kvartal i izveštaj. */
+function kapijaPala(kap, vrednost) {
+  const v = Number(vrednost || 0);
+  return kap.manje ? v > 0 && v <= kap.cilj : v >= kap.cilj;
+}
+
+function sastaviIzvestaj(data, mon) {
+  const dani = nedeljaDani(mon);
+  const petak = dani[4];
+  const w = data.nedelje[mon] || {};
+  const status = data.stanje.status;
+  const R = [];
+
+  /* 1 — zaglavlje */
+  const q = kvartalZa(petak) || tekuciKvartal();
+  R.push(`IZVEŠTAJ ZA PETAK — ${dm(petak)}.${petak.slice(0, 4)}.`);
+  R.push(`${q.ime} — ${q.tema}`);
+  R.push(`${danaDo(q.do)} dana do kraja kvartala · ${danaDo(KRAJ)} dana do 30.09.2027.`);
+  R.push("");
+
+  /* 2 i 3 — ocene po oblastima, promašene stavke u zagradi */
+  const ocene = oceniNedelju(w, data, mon);
+  let ukupno = 0;
+  data.oblasti.forEach((ob) => {
+    const rel = ob.stavke.filter((s) => !s.samo || s.samo === status);
+    const promaseno = rel
+      .filter((s) => !(s.auto ? autoVrednost(s.auto, dani, data).ok : !!(w.stavke || {})[s.k]))
+      .map((s) => s.t);
+    ukupno += ocene[ob.k];
+    R.push(`${ob.ime.toUpperCase()}  ${ocene[ob.k]}/10  (${promaseno.length ? promaseno.join(", ") : "sve pogođeno"})`);
+  });
+  R.push(`UKUPNO  ${ukupno}/${data.oblasti.length * 10}`);
+  R.push("");
+
+  /* 4 — dan po dan */
+  R.push("DAN PO DAN");
+  dani.forEach((dd, i) => {
+    const v = data.dani[dd];
+    /* "nema unosa" znači da dan nije ni otvoren. Namerno 0 i false računamo
+       kao unos — to je odgovor "ne", a ne odsustvo odgovora. */
+    const ima = v && Object.keys(v).some((k) => v[k] !== "" && v[k] !== undefined && v[k] !== null);
+    const glava = `${DANI_KRATKO[i]} ${dm(dd)}`;
+    if (!ima) return R.push(`${glava} — nema unosa`);
+    const delovi = data.dnevno.map((x) => {
+      const ime = KRATKO[x.k] || x.k;
+      return x.tip === "check"
+        ? `${ime} ${v[x.k] ? "✓" : "✗"}`
+        : `${ime} ${Number(v[x.k] || 0)}${x.jed || ""}`;
+    });
+    R.push(`${glava} — ${delovi.join(" · ")}`);
+  });
+  R.push("");
+
+  /* 5 — nedeljni zbirovi */
+  R.push("NEDELJNI ZBIROVI");
+  data.dnevno.forEach((x) => {
+    const ime = ZBIR_IME[x.k] || x.ime;
+    if (x.tip === "check") {
+      const n = dani.reduce((a, dd) => a + ((data.dani[dd] || {})[x.k] ? 1 : 0), 0);
+      R.push(`${ime}: ${n} od 7`);
+    } else {
+      const s = dani.reduce((a, dd) => a + Number((data.dani[dd] || {})[x.k] || 0), 0);
+      const uSatima = x.jed === "min" ? ` (${Math.round((s / 60) * 10) / 10}h)` : "";
+      R.push(`${ime}: ${fmt(s)}${x.jed || ""}${uSatima}`);
+    }
+  });
+  R.push("");
+
+  /* 6 — poređenje sa prethodnom nedeljom */
+  const p = new Date(mon + "T00:00:00");
+  p.setDate(p.getDate() - 7);
+  const prosla = iso(p);
+  const prosliDani = nedeljaDani(prosla);
+  const imaProslu =
+    !!data.nedelje[prosla] || prosliDani.some((dd) => data.dani[dd] && Object.keys(data.dani[dd]).length);
+  if (imaProslu) {
+    const staro = oceniNedelju(data.nedelje[prosla] || {}, data, prosla);
+    R.push(`POREĐENJE SA NEDELJOM OD ${dm(prosla)}.`);
+    data.oblasti.forEach((ob) => {
+      const r = ocene[ob.k] - staro[ob.k];
+      R.push(`${ob.ime} ${ocene[ob.k]}/10 (${r > 0 ? "+" : ""}${r})`);
+    });
+    R.push("");
+  }
+
+  /* 7 — stanje kvartala */
+  const kv = data.kvartali[q.id] || {};
+  const pale = q.kapije.filter((kap) => kapijaPala(kap, kv[kap.k])).length;
+  R.push(`KAPIJE ${q.ime} — palo ${pale}/${q.kapije.length}`);
+  q.kapije.forEach((kap) => {
+    const cilj = `${kap.manje ? "max " : ""}${fmt(kap.cilj)}${kap.jed || ""}`;
+    R.push(`${kap.ime}: ${fmt(kv[kap.k] || 0)}${kap.jed || ""} / ${cilj}`);
+  });
+  R.push("");
+
+  /* 8 — dva pitanja */
+  const laz = (w.laz || "").trim();
+  const izb = (w.izbegavao || "").trim();
+  if (laz || izb) {
+    R.push("DVA PITANJA");
+    if (laz) R.push(`Najveća laž: ${laz}`);
+    if (izb) R.push(`Izbegavao: ${izb}`);
+  }
+
+  return R.join("\n").trimEnd() + "\n";
+}
+
 function Nedelja({ data, snimi }) {
   const mon = ponedeljak(new Date());
   const [izabrana, setIzabrana] = useState(mon);
   const [uredi, setUredi] = useState(false);
+  const [kopirano, setKopirano] = useState(false);
+  const [rucno, setRucno] = useState("");
+  const rucnoRef = useRef(null);
   const dani = nedeljaDani(izabrana);
   const w = data.nedelje[izabrana] || { stavke: {}, laz: "", izbegavao: "" };
   const status = data.stanje.status;
@@ -234,6 +365,33 @@ function Nedelja({ data, snimi }) {
     if (iso(x) > mon) return;
     setIzabrana(iso(x));
   };
+
+  /* --- izveštaj za petak (za nedelju koja je izabrana, ne samo tekuću) --- */
+  const kopirajIzvestaj = async () => {
+    const tekst = sastaviIzvestaj(data, izabrana);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("nema clipboard");
+      await navigator.clipboard.writeText(tekst);
+      setRucno("");
+      setKopirano(true);
+      setTimeout(() => setKopirano(false), 2000);
+    } catch {
+      setRucno(tekst);
+    }
+  };
+
+  /* Promena nedelje poništava zastareo izveštaj. */
+  useEffect(() => {
+    setRucno("");
+    setKopirano(false);
+  }, [izabrana]);
+
+  useEffect(() => {
+    if (rucno && rucnoRef.current) {
+      rucnoRef.current.focus();
+      rucnoRef.current.select();
+    }
+  }, [rucno]);
 
   /* --- izmene kriterijuma --- */
   const izmeniStavku = (obK, sK, polje, v) => {
@@ -350,6 +508,20 @@ function Nedelja({ data, snimi }) {
           <span>Šta sam izbegavao</span>
           <textarea value={w.izbegavao || ""} onChange={(e) => set("izbegavao", e.target.value)} rows={2} />
         </label>
+
+        <div className="tb-dugmad">
+          <button className="tb-pilula" onClick={kopirajIzvestaj}>
+            {kopirano ? "Kopirano" : "Kopiraj izveštaj za petak"}
+          </button>
+          <button className="tb-pilula" onClick={() => izvezi(data)}>Preuzmi JSON</button>
+        </div>
+
+        {rucno && (
+          <label className="tb-polje">
+            <span>Clipboard nije prošao — kopiraj rukom</span>
+            <textarea ref={rucnoRef} value={rucno} readOnly rows={14} onFocus={(e) => e.target.select()} />
+          </label>
+        )}
       </section>
 
       {istorija.length > 1 && (
@@ -382,10 +554,7 @@ function Kvartal({ data, snimi }) {
   const v = data.kvartali[id] || {};
   const set = (k, n) => snimi({ ...data, kvartali: { ...data.kvartali, [id]: { ...v, [k]: n } } });
 
-  const pala = (kap) => {
-    const val = Number(v[kap.k] || 0);
-    return kap.manje ? val > 0 && val <= kap.cilj : val >= kap.cilj;
-  };
+  const pala = (kap) => kapijaPala(kap, v[kap.k]);
   const svePale = q.kapije.every(pala);
 
   return (
@@ -457,10 +626,7 @@ function Godina({ data, snimi }) {
   const setS = (k, v) => snimi({ ...data, stanje: { ...data.stanje, [k]: v } });
 
   const q3 = data.kvartali["Q3-2027"] || {};
-  const kapijePale = KVARTALI[3].kapije.every((kap) => {
-    const val = Number(q3[kap.k] || 0);
-    return kap.manje ? val > 0 && val <= kap.cilj : val >= kap.cilj;
-  });
+  const kapijePale = KVARTALI[3].kapije.every((kap) => kapijaPala(kap, q3[kap.k]));
 
   const mere = [
     { k: "netto", ime: "Moja neto imovina", od: BAZA.netto, cilj: GODINA_CILJ.netto, jed: "€" },
