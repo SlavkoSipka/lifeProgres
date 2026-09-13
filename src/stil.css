@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap');
+
+:root{--ink:#15170e;--ink2:#1d2014;--linija:#2f331f;--ploca:#ece7d9;--siva:#8b8f74;--signal:#f5c518;--ok:#8faa4e;--los:#c4553f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink)}
+
+.tb{font-family:'Barlow',system-ui,sans-serif;background:var(--ink);color:var(--ploca);min-height:100vh;padding-bottom:3rem}
+.tb-load{padding:3rem;text-align:center;color:var(--siva);font-family:'Barlow',sans-serif}
+
+.tb-head{padding:1.25rem 1rem .75rem;border-bottom:1px solid var(--linija)}
+.tb-head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;max-width:32rem;margin:0 auto}
+.tb-kicker{font-size:.75rem;color:var(--siva)}
+.tb-naslov{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:2rem;margin:.1rem 0 0;letter-spacing:-.01em}
+.tb-brojaci{text-align:right;display:grid;gap:.35rem}
+.tb-brojaci b{font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;line-height:1;color:var(--signal);display:block;font-variant-numeric:tabular-nums}
+.tb-brojaci span{font-size:.65rem;color:var(--siva);display:block;max-width:8rem}
+
+.tb-greska{background:var(--los);color:#fff;padding:.5rem 1rem;font-size:.85rem;text-align:center}
+
+.tb-tabs{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--linija);position:sticky;top:0;background:var(--ink);z-index:5;max-width:32rem;margin:0 auto}
+.tb-tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--siva);padding:.8rem .15rem;font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:600;cursor:pointer}
+.tb-tab-on{color:var(--ploca);border-bottom-color:var(--signal)}
+.tb-tab:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
+
+.tb-main{padding:1rem;max-width:32rem;margin:0 auto}
+
+.tb-datum{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.tb-datum span{font-family:'Barlow Condensed',sans-serif;font-size:1.15rem;font-weight:600}
+.tb-datum button{background:none;border:1px solid var(--linija);color:var(--ploca);width:2.2rem;height:2.2rem;font-size:1.2rem;cursor:pointer;border-radius:2px}
+.tb-datum button:disabled{opacity:.25;cursor:default}
+
+.tb-plocica{background:var(--signal);color:var(--ink);display:flex;align-items:baseline;justify-content:center;gap:.4rem;padding:1.1rem;margin-bottom:1rem;border-radius:3px}
+.tb-plocica-broj{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:3.75rem;line-height:.85;font-variant-numeric:tabular-nums}
+.tb-plocica-od{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:1.15rem;opacity:.6}
+
+.tb-lista{list-style:none;margin:0;padding:0}
+.tb-red{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.7rem 0;border-bottom:1px solid var(--linija)}
+.tb-red-tekst{display:flex;flex-direction:column;gap:.1rem;min-width:0}
+.tb-red-ime{font-size:.95rem}
+.tb-red-pod{font-size:.72rem;color:var(--siva)}
+.tb-red-ok .tb-red-ime{color:var(--ok)}
+
+.tb-kvad{width:2.1rem;height:2.1rem;flex:0 0 auto;border:1px solid var(--linija);background:var(--ink2);color:var(--ink);font-size:1.1rem;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center}
+.tb-kvad-on{background:var(--ok);border-color:var(--ok);color:var(--ink)}
+.tb-kvad-auto{cursor:default;opacity:.85}
+.tb-kvad:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+.tb-unos{display:flex;align-items:center;gap:.3rem;flex:0 0 auto}
+.tb-unos input{width:4.5rem;background:var(--ink2);border:1px solid var(--linija);color:var(--ploca);padding:.45rem .5rem;font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;text-align:right;border-radius:2px;font-variant-numeric:tabular-nums}
+.tb-unos span{font-size:.75rem;color:var(--siva);width:1.6rem}
+.tb-unos-wide{margin-top:.5rem}
+.tb-unos-wide input{width:7rem}
+
+.tb-najnize{border:1px solid var(--los);padding:.75rem;margin-bottom:1rem;border-radius:2px}
+.tb-najnize-nas{font-size:.72rem;color:var(--los);margin-bottom:.4rem}
+.tb-najnize-red{display:flex;justify-content:space-between;padding:.2rem 0;font-size:1rem}
+.tb-najnize-red b{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}
+
+.tb-status{display:flex;align-items:center;gap:.4rem;margin-bottom:1rem;font-size:.8rem;color:var(--siva);flex-wrap:wrap}
+.tb-pilula{background:var(--ink2);border:1px solid var(--linija);color:var(--siva);padding:.3rem .7rem;font-family:'Barlow Condensed',sans-serif;font-size:.9rem;cursor:pointer;border-radius:2px}
+.tb-pilula-on{background:var(--ploca);color:var(--ink);border-color:var(--ploca)}
+.tb-pilula-opasno{border-color:var(--los);color:var(--los)}
+
+.tb-upozorenje{border-left:2px solid var(--signal);padding:.5rem .75rem;font-size:.82rem;color:var(--siva);margin:0 0 1rem;line-height:1.5}
+.tb-zasto{font-size:.78rem;color:var(--siva);margin:.5rem 0 0}
+
+.tb-oblast{margin:1.5rem 0}
+.tb-oblast-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--ploca);padding-bottom:.3rem}
+.tb-oblast-head h2{font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;font-weight:600;margin:0}
+.tb-oc{font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;color:var(--siva);font-variant-numeric:tabular-nums}
+.tb-oc-ok{color:var(--ok)}
+.tb-oc-los{color:var(--los)}
+
+.tb-red-uredi{gap:.4rem}
+.tb-edit-tekst{flex:1 1 auto;min-width:0;background:var(--ink2);border:1px solid var(--linija);color:var(--ploca);padding:.4rem .5rem;font-family:'Barlow',sans-serif;font-size:.88rem;border-radius:2px}
+.tb-edit-bod{width:3rem;background:var(--ink2);border:1px solid var(--linija);color:var(--signal);padding:.4rem;text-align:center;font-family:'Barlow Condensed',sans-serif;border-radius:2px}
+.tb-brisi{background:none;border:1px solid var(--los);color:var(--los);width:2rem;height:2rem;cursor:pointer;border-radius:2px;font-size:1rem}
+.tb-dodaj{margin-top:.6rem;background:none;border:1px dashed var(--linija);color:var(--siva);padding:.45rem .8rem;width:100%;cursor:pointer;border-radius:2px;font-family:'Barlow',sans-serif;font-size:.85rem}
+
+.tb-polje{display:block;margin-top:.9rem}
+.tb-polje span{font-size:.78rem;color:var(--siva);display:block;margin-bottom:.3rem}
+.tb-polje textarea{width:100%;background:var(--ink2);border:1px solid var(--linija);color:var(--ploca);padding:.55rem;font-family:'Barlow',sans-serif;font-size:.9rem;border-radius:2px;resize:vertical}
+
+.tb-kvartal-izbor{display:flex;gap:.35rem;margin-bottom:.85rem;flex-wrap:wrap}
+.tb-tema{font-size:.85rem;color:var(--siva);margin-bottom:1rem}
+
+.tb-nagrada{border:1px solid var(--linija);padding:.85rem;border-radius:2px;margin-bottom:1rem}
+.tb-nagrada span{font-size:.7rem;color:var(--siva);display:block}
+.tb-nagrada b{font-family:'Barlow Condensed',sans-serif;font-size:1.25rem;display:block;margin:.15rem 0}
+.tb-nagrada small{font-size:.75rem;color:var(--siva)}
+.tb-nagrada-on{border-color:var(--signal)}
+.tb-nagrada-on b{color:var(--signal)}
+
+.tb-kapija{padding:.85rem 0;border-bottom:1px solid var(--linija)}
+.tb-kapija-head{display:flex;justify-content:space-between;gap:.75rem;font-size:.9rem;margin-bottom:.45rem}
+.tb-kapija-cilj{color:var(--siva);font-family:'Barlow Condensed',sans-serif;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tb-kapija-ok .tb-kapija-head{color:var(--ok)}
+.tb-traka{height:5px;background:var(--ink2);border-radius:3px;overflow:hidden}
+.tb-traka i{display:block;height:100%;background:var(--signal)}
+.tb-kapija-ok .tb-traka i{background:var(--ok)}
+.tb-traka-big{height:9px;margin-bottom:.5rem}
+
+.tb-ulog{border:1px solid var(--linija);padding:.9rem;border-radius:2px;margin-top:1.25rem}
+.tb-ulog h3{font-family:'Barlow Condensed',sans-serif;font-size:1.15rem;margin:0 0 .4rem}
+.tb-ulog p{margin:.25rem 0;font-size:.88rem}
+.tb-ulog small{font-size:.75rem;color:var(--siva);display:block;margin-top:.4rem}
+.tb-ulog-ok{border-color:var(--signal)}
+.tb-ulog-kazna{border-color:var(--los)}
+.tb-ulog-kazna h3{color:var(--los)}
+
+.tb-pravila{margin:.6rem 0 0;padding-left:1.1rem;font-size:.88rem;line-height:1.55}
+.tb-pravila li{margin-bottom:.4rem}
+
+.tb-dugmad{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.75rem}
+.tb-fus{font-size:.8rem;color:var(--siva);margin:1.5rem 0 0;line-height:1.5}
+
+@media (prefers-reduced-motion:no-preference){.tb-traka i{transition:width .25s ease}}
