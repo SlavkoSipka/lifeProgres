@@ -10,6 +10,11 @@
 export const POCETAK = "2026-09-13";
 export const KRAJ = "2027-09-30";
 
+/* Podigni kad menjaš DNEVNO ili OBLASTI. Aplikacija tada prepisuje
+   kriterijume iz ovog fajla preko onih koje je korisnik editovao u njoj.
+   Uneti podaci (dani, nedelje, kvartali) se ne diraju. */
+export const VERZIJA = 2;
+
 /* Gde sam bio na startu — koristi se za trake napretka */
 export const BAZA = {
   netto: 9000,
@@ -35,14 +40,15 @@ export const ULOG = {
    DNEVNE STAVKE
    tip: "check" (da/ne) ili "broj" (unos brojke)
    cilj: koliko treba da bi se računalo kao pogođeno
+   neocenjuje: prikazuje se za unos, ali ne ulazi u dnevni brojač
    --------------------------------------------------------- */
 export const DNEVNO = [
   { k: "poziv", ime: "Prodajni poziv", tip: "check", cilj: 1, pod: "razgovor, ne mejl" },
-  { k: "proizvod", ime: "Sati na proizvodu", tip: "broj", cilj: 2, jed: "h", pod: "ne na usluzi" },
-  { k: "naplaceno", ime: "Naplaćeno danas", tip: "broj", cilj: 600, jed: "€", pod: "na računu" },
+  { k: "proizvod", ime: "Sati na proizvodu", tip: "broj", cilj: 1, jed: "h", pod: "dnevni znak je streak — granica je nedeljnih 10h" },
+  { k: "naplaceno", ime: "Naplaćeno danas", tip: "broj", cilj: 600, jed: "€", pod: "upiši kad legne — ne ocenjuje se dnevno", neocenjuje: true },
   { k: "trening", ime: "Trening", tip: "check", cilj: 1, pod: "5 od 7 dana" },
   { k: "san", ime: "Zaspao pre 00:30", tip: "check", cilj: 1, pod: "telefon van sobe" },
-  { k: "faks", ime: "Fakultet", tip: "broj", cilj: 30, jed: "min", pod: "radnim danom" },
+  { k: "faks", ime: "Fakultet", tip: "broj", cilj: 120, jed: "min", pod: "radnim danom" },
 ];
 
 /* ---------------------------------------------------------
@@ -69,19 +75,19 @@ export const OBLASTI = [
     k: "odnosi", ime: "Odnosi",
     zasto: "Mreža koja donosi poslove bez hladnog zvanja.",
     stavke: [
-      { k: "o1", t: "1 nova osoba uživo", b: 3 },
+      { k: "o1", t: "Nova osoba upoznata uživo", b: 3 },
       { k: "o2", t: "Kafa sa nekim ko je ispred mene", b: 3 },
-      { k: "o3", t: "Pozvao roditelje", b: 2 },
       { k: "o4", t: "Javio se nekom bez potrebe", b: 2 },
+      { k: "o5", t: "Kontaktirao nekog iz struke koga ne poznajem", b: 2 },
     ],
   },
   {
     k: "ljubav", ime: "Ljubav",
     zasto: "Oženjen 2031, prvo dete 2034. Partner mora da postoji do 2029.",
     stavke: [
-      { k: "l1", t: "Nova osoba upoznata sa namerom", b: 4, samo: "sam" },
-      { k: "l2", t: "Pitao direktno umesto da pogađam", b: 3, samo: "sam" },
-      { k: "l3", t: "Nisam čekao nečiju poruku", b: 3, samo: "sam" },
+      { k: "l1", t: "Napravio potez ka nekoj koja mi se sviđa (poruka, poziv, predlog izlaska)", b: 4, samo: "sam" },
+      { k: "l2", t: "Rekao šta hoću umesto da čekam znak", b: 3, samo: "sam" },
+      { k: "l3", t: "Bio negde gde se upoznaju novi ljudi", b: 3, samo: "sam" },
       { k: "l4", t: "Izlazak bez telefona, 2h+", b: 3, samo: "veza" },
       { k: "l5", t: "Težak razgovor koji sam izbegavao", b: 3, samo: "veza" },
       { k: "l6", t: "Rekao šta mi smeta istog dana", b: 2, samo: "veza" },
@@ -93,20 +99,18 @@ export const OBLASTI = [
     zasto: "150k MRR se ne gradi isporukom, nego prodajom i proizvodom.",
     stavke: [
       { k: "p1", t: "4 prodajna poziva", b: 3, auto: "poziv>=4" },
-      { k: "p2", t: "10h na proizvodu", b: 3, auto: "proizvod>=10" },
+      { k: "p2", t: "10h na proizvodu", b: 4, auto: "proizvod>=10" },
       { k: "p3", t: "Nedeljni pregled sa Strahinjom", b: 2 },
       { k: "p4", t: "Svi follow-up pozivi odrađeni", b: 1 },
-      { k: "p5", t: "Nijedan nov projekat bez da je jedan izbačen", b: 1 },
     ],
   },
   {
     k: "novac", ime: "Novac",
     zasto: "9.000€ → 90.000€ za godinu dana.",
     stavke: [
-      { k: "n1", t: "3.000€+ naplaćeno", b: 4, auto: "naplaceno>=3000" },
-      { k: "n2", t: "MRR veći nego prošle nedelje", b: 2 },
-      { k: "n3", t: "0 kupovina van plana", b: 2 },
-      { k: "n4", t: "Znam tačno stanje firme i svoje", b: 2 },
+      { k: "n1", t: "Naplaćeno prati tempo kvartala", b: 4, auto: "tempo" },
+      { k: "n2", t: "MRR veći nego prošle nedelje", b: 3 },
+      { k: "n3", t: "0 kupovina van plana", b: 3 },
     ],
   },
   {
@@ -122,10 +126,10 @@ export const OBLASTI = [
     k: "rast", ime: "Rast",
     zasto: "Čovek koji vodi 150k MRR se ne postaje slučajno.",
     stavke: [
-      { k: "r1", t: "4h fakultet", b: 3, auto: "faks>=240" },
+      { k: "r1", t: "14h fakultet", b: 4, auto: "faks>=840" },
       { k: "r2", t: "Snimio i preslušao svoj prodajni poziv", b: 3 },
       { k: "r3", t: "30 strana pročitano", b: 2 },
-      { k: "r4", t: "Naučio 1 stvar i odmah primenio", b: 2 },
+      { k: "r4", t: "Naučio 1 stvar i odmah primenio", b: 1 },
     ],
   },
 ];
@@ -148,7 +152,7 @@ export const KVARTALI = [
       { k: "knjigovodje", ime: "Knjigovođe sa kojima sam pričao", cilj: 8 },
       { k: "honorarac", ime: "Prvi honorarac zaposlen (do 30.11)", cilj: 1 },
       { k: "tezina", ime: "Težina (kg)", cilj: 80 },
-      { k: "netto", ime: "Moja neto imovina", cilj: 35000 },
+      { k: "netto", ime: "Moja neto imovina", cilj: 27000 },
     ],
   },
   {
@@ -245,6 +249,7 @@ export const PRAVILA = [
       "„Neprijatno mi je“ nije razlog. To je obično znak da stavka radi.",
       "Cilj se ne spušta u poslednjoj nedelji kvartala. Spušta se na početku ili nikad.",
       "Jedan nov projekat unutra znači jedan napolje. Vas ste dvojica.",
+      "Prva izmena ciljeva: 13.09.2026 — neto imovina za Q4 spuštena sa 35.000€ na 27.000€. Cilj se spušta na početku kvartala ili nikad.",
     ],
   },
 ];

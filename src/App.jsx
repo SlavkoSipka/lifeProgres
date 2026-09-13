@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { DNEVNO, OBLASTI, KVARTALI, PRAVILA, ULOG, BAZA, GODINA_CILJ, POCETAK, KRAJ } from "./config.js";
+import { DNEVNO, OBLASTI, KVARTALI, PRAVILA, ULOG, BAZA, GODINA_CILJ, POCETAK, KRAJ, VERZIJA } from "./config.js";
 import { ucitaj, snimi as snimiUStorage, rezimCuvanja, izvezi } from "./storage.js";
 
 /* ============================ POMOĆNE ============================ */
@@ -37,10 +37,8 @@ function nedeljaDani(mon) {
 
 const danaDo = (c) => Math.max(0, Math.ceil((new Date(c) - new Date()) / 86400000));
 
-function tekuciKvartal() {
-  const t = danas();
-  return KVARTALI.find((q) => t >= q.od && t <= q.do) || KVARTALI[0];
-}
+const kvartalZa = (d) => KVARTALI.find((q) => d >= q.od && d <= q.do) || null;
+const tekuciKvartal = () => kvartalZa(danas()) || KVARTALI[0];
 
 function prazno() {
   return {
@@ -50,6 +48,7 @@ function prazno() {
     stanje: { status: "sam", netto: BAZA.netto, mrr: BAZA.mrr },
     dnevno: JSON.parse(JSON.stringify(DNEVNO)),
     oblasti: JSON.parse(JSON.stringify(OBLASTI)),
+    verzija: VERZIJA,
   };
 }
 
@@ -65,7 +64,19 @@ export default function App() {
     (async () => {
       const d = await ucitaj();
       if (!d) return setData(prazno());
-      setData({ ...prazno(), ...d, dnevno: d.dnevno || prazno().dnevno, oblasti: d.oblasti || prazno().oblasti });
+      const osnova = prazno();
+      /* Nova verzija kriterijuma prebija ono što je korisnik editovao u aplikaciji.
+         Dani, nedelje i kvartali se ne diraju. */
+      const zastarelo = d.verzija !== VERZIJA;
+      const novo = {
+        ...osnova,
+        ...d,
+        dnevno: zastarelo ? osnova.dnevno : d.dnevno || osnova.dnevno,
+        oblasti: zastarelo ? osnova.oblasti : d.oblasti || osnova.oblasti,
+        verzija: VERZIJA,
+      };
+      setData(novo);
+      if (zastarelo) snimiUStorage(novo);
     })();
   }, []);
 
@@ -131,7 +142,9 @@ function Danas({ data, snimi, datum, setDatum }) {
   const d = data.dani[datum] || {};
   const lista = data.dnevno;
   const set = (k, v) => snimi({ ...data, dani: { ...data.dani, [datum]: { ...d, [k]: v } } });
-  const pogodjeno = lista.filter((x) => (x.tip === "check" ? d[x.k] : (d[x.k] || 0) >= x.cilj)).length;
+  /* Stavke sa neocenjuje se unose, ali ne ulaze ni u brojilac ni u imenilac. */
+  const ocenjive = lista.filter((x) => !x.neocenjuje);
+  const pogodjeno = ocenjive.filter((x) => (x.tip === "check" ? d[x.k] : (d[x.k] || 0) >= x.cilj)).length;
 
   const pomeri = (n) => {
     const x = new Date(datum + "T00:00:00");
@@ -150,18 +163,18 @@ function Danas({ data, snimi, datum, setDatum }) {
 
       <div className="tb-plocica">
         <span className="tb-plocica-broj">{pogodjeno}</span>
-        <span className="tb-plocica-od">/{lista.length}</span>
+        <span className="tb-plocica-od">/{ocenjive.length}</span>
       </div>
 
       <ul className="tb-lista">
         {lista.map((x) => {
           const v = d[x.k];
-          const ok = x.tip === "check" ? !!v : (v || 0) >= x.cilj;
+          const ok = !x.neocenjuje && (x.tip === "check" ? !!v : (v || 0) >= x.cilj);
           return (
             <li key={x.k} className={ok ? "tb-red tb-red-ok" : "tb-red"}>
               <div className="tb-red-tekst">
                 <span className="tb-red-ime">{x.ime}</span>
-                <span className="tb-red-pod">{x.pod}{x.tip === "broj" ? ` — cilj ${x.cilj}${x.jed || ""}` : ""}</span>
+                <span className="tb-red-pod">{x.pod}{x.tip === "broj" && !x.neocenjuje ? ` — cilj ${x.cilj}${x.jed || ""}` : ""}</span>
               </div>
               {x.tip === "check" ? (
                 <button className={ok ? "tb-kvad tb-kvad-on" : "tb-kvad"} onClick={() => set(x.k, !v)}>{ok ? "✓" : ""}</button>
@@ -184,7 +197,34 @@ function Danas({ data, snimi, datum, setDatum }) {
 
 /* ============================ NEDELJA ============================ */
 
+/* Tempo naplate: da li je naplaćeno u kvartalu u koraku sa protekom kvartala.
+   Ne poredi se sa fiksnim brojem, nego sa linearnim ciljem do datuma. */
+function tempoNaplate(dani, data) {
+  const kraj = dani[6];
+  const q = kvartalZa(kraj);
+  if (!q) return { ok: false, txt: "nema cilja naplate" };
+
+  /* Q1 2027 ima naplatu u "ostalo", ne u kapijama — tamo je ključ sa x_ prefiksom. */
+  const uKapijama = q.kapije.find((x) => x.k === "naplaceno");
+  const cilj = uKapijama || q.ostalo.find((x) => x.k === "naplaceno");
+  if (!cilj) return { ok: false, txt: "nema cilja naplate", izvor: "iz kvartala" };
+
+  const DAN = 86400000;
+  const ukupno = Math.round((new Date(q.do) - new Date(q.od)) / DAN) + 1;
+  const proteklo = Math.min(ukupno, Math.max(0, Math.round((new Date(kraj) - new Date(q.od)) / DAN) + 1));
+  const ocekivano = Math.round(cilj.cilj * (proteklo / ukupno));
+
+  const stvarno = Number((data.kvartali[q.id] || {})[uKapijama ? "naplaceno" : "x_naplaceno"] || 0);
+  const jed = cilj.jed || "€";
+  return {
+    ok: stvarno >= ocekivano,
+    txt: `${fmt(stvarno)}${jed} / ${fmt(ocekivano)}${jed} očekivano`,
+    izvor: "iz kvartala",
+  };
+}
+
 function autoVrednost(izraz, dani, data) {
+  if (izraz === "tempo") return tempoNaplate(dani, data);
   const [polje, prag] = izraz.split(">=");
   const p = Number(prag);
   const def = data.dnevno.find((x) => x.k === polje);
@@ -196,7 +236,7 @@ function autoVrednost(izraz, dani, data) {
   });
   const jed = def?.tip === "check" ? "x" : def?.jed || "";
   const prikaz = polje === "faks" ? `${Math.round((zbir / 60) * 10) / 10}h` : `${fmt(zbir)}${jed}`;
-  return { ok: zbir >= p, txt: prikaz };
+  return { ok: zbir >= p, txt: prikaz, izvor: "iz dnevnih" };
 }
 
 function oceniNedelju(w, data, mon) {
@@ -225,8 +265,6 @@ const KRATKO = { naplaceno: "naplaćeno" };
    nedeljnim zbirovima zvuče pogrešno. Ovde samo ta odstupanja. */
 const ZBIR_IME = { naplaceno: "Naplaćeno", trening: "Treninzi", poziv: "Prodajni pozivi", san: "Noći pre 00:30" };
 const dm = (d) => `${d.slice(8)}.${d.slice(5, 7)}`;
-
-const kvartalZa = (d) => KVARTALI.find((q) => d >= q.od && d <= q.do) || null;
 
 /* Pravilo kapija na jednom mestu — koristi ga i tab Kvartal i izveštaj. */
 function kapijaPala(kap, vrednost) {
@@ -481,7 +519,7 @@ function Nedelja({ data, snimi }) {
                 <li key={s.k} className={ok ? "tb-red tb-red-ok" : "tb-red"}>
                   <div className="tb-red-tekst">
                     <span className="tb-red-ime">{s.t}</span>
-                    <span className="tb-red-pod">{a ? `iz dnevnih: ${a.txt}` : `${s.b} bodova`}</span>
+                    <span className="tb-red-pod">{a ? `${a.izvor}: ${a.txt}` : `${s.b} ${s.b === 1 ? "bod" : s.b < 5 ? "boda" : "bodova"}`}</span>
                   </div>
                   {a ? (
                     <span className={ok ? "tb-kvad tb-kvad-on tb-kvad-auto" : "tb-kvad tb-kvad-auto"}>{ok ? "✓" : ""}</span>
